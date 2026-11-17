@@ -225,17 +225,45 @@ systemctl --user enable --now geo-solo3-mqtt.service
 journalctl --user -u geo-solo3-mqtt.service -f
 ```
 
-Example receiver startup from the original system-wide service on a Raspberry Pi 4B:
+If `journalctl --user` reports `No journal files were found`, check the service status and read its messages from the system journal. The second command filters by the current account and user unit, and works with volatile journal storage. [journalctl documentation](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html)
+
+```sh
+systemctl --user status geo-solo3-mqtt.service --no-pager
+sudo journalctl -b -f _SYSTEMD_USER_UNIT=geo-solo3-mqtt.service _UID="$(id -u)"
+```
+
+Example `systemctl --user status` output from a Raspberry Pi 4B, with the home directory shown as `~`:
 
 ```text
-Nov 17 12:03:48 raspberrypi4b systemd[1]: Started geo-solo3-mqtt.service - Geo Solo III meter to MQTT.
-Nov 17 12:03:49 raspberrypi4b bash[2460]: WARNING:root:Experimental layout assumption: verify values against your meter/IHD
-Nov 17 12:03:49 raspberrypi4b bash[2460]: Detached kernel driver
-Nov 17 12:03:49 raspberrypi4b bash[2460]: Found Rafael Micro R828D tuner
-Nov 17 12:03:49 raspberrypi4b bash[2460]: Disabled direct sampling mode
-Nov 17 12:03:49 raspberrypi4b bash[2460]: [R82XX] PLL not locked!
-Nov 17 12:03:49 raspberrypi4b bash[2460]: [R82XX] PLL not locked!
-Nov 17 12:03:50 raspberrypi4b bash[2460]: INFO:geo_decoder:Geo radio receiver started at 2026-11-17T12:03:50.081067+00:00
+● geo-solo3-mqtt.service - Geo Solo III meter to MQTT
+     Loaded: loaded (~/.config/systemd/user/geo-solo3-mqtt.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2026-11-17 12:27:58 GMT; 1min 41s ago
+ Invocation: db946668a0d84fb0a859f283b794c896
+   Main PID: 2709 (mosquitto_pub)
+      Tasks: 8 (limit: 3960)
+        CPU: 53.291s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/geo-solo3-mqtt.service
+             ├─2709 /usr/bin/mosquitto_pub -h 192.168.50.161 -p 1883 -t geo/solo3/b3c0eb/state -q 1 -l
+             └─2711 .venv/bin/python cli.py --meter-id B3C0EB --format json
+
+Nov 17 12:27:58 raspberrypi4b systemd[1067]: Started geo-solo3-mqtt.service - Geo Solo III meter to MQTT.
+Nov 17 12:27:58 raspberrypi4b bash[2711]: WARNING:root:Experimental layout assumption: verify values against your meter/IHD
+Nov 17 12:27:58 raspberrypi4b bash[2711]: Found Rafael Micro R828D tuner
+Nov 17 12:27:59 raspberrypi4b bash[2711]: Disabled direct sampling mode
+Nov 17 12:27:59 raspberrypi4b bash[2711]: [R82XX] PLL not locked!
+Nov 17 12:27:59 raspberrypi4b bash[2711]: [R82XX] PLL not locked!
+Nov 17 12:27:59 raspberrypi4b bash[2711]: INFO:geo_decoder:Geo radio receiver started at 2026-11-17T12:27:59.401024+00:00
+```
+
+Example output from the filtered system journal:
+
+```text
+Nov 17 12:27:58 raspberrypi4b bash[2711]: WARNING:root:Experimental layout assumption: verify values against your meter/IHD
+Nov 17 12:27:58 raspberrypi4b bash[2711]: Found Rafael Micro R828D tuner
+Nov 17 12:27:59 raspberrypi4b bash[2711]: Disabled direct sampling mode
+Nov 17 12:27:59 raspberrypi4b bash[2711]: [R82XX] PLL not locked!
+Nov 17 12:27:59 raspberrypi4b bash[2711]: [R82XX] PLL not locked!
+Nov 17 12:27:59 raspberrypi4b bash[2711]: INFO:geo_decoder:Geo radio receiver started at 2026-11-17T12:27:59.401024+00:00
 ```
 
 The journal shows the receiver starting. Use MQTT Explorer or Home Assistant's MQTT topic listener to confirm delivery. The startup PLL messages appeared on this working setup. Press **Ctrl+C** to leave the log view while the service keeps running.
