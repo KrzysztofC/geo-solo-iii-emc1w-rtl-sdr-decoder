@@ -80,6 +80,8 @@ No files or raw I/Q recordings are saved automatically. Redirecting output to a 
 
 Reception is fixed at 868 MHz, 2.4 MS/s and 28 dB gain. Poor antenna placement, interference or different radio variants may prevent decoding. A quiet console means no fresh matching CRC-valid packets were found; it does not prove a hardware fault.
 
+Measurement mode drops CRC-valid 29-byte payloads that start with `00 47 40 50`. In two logged frames, the extra leading zero shifted the measurement fields by one byte and caused large spikes in the MQTT energy readings. Use `--discover --include-frame` to inspect those frames as raw packets.
+
 ## Home Assistant
 
 Publish the decoder's JSON readings from a Raspberry Pi to the MQTT broker used by Home Assistant. The examples use meter ID `B3C0EB`, broker `192.168.50.161:1883`, and MQTT username `mqtt`. Replace those values for your setup. If you change the MQTT topic, use the same topic in the publisher, MQTT Explorer, and Home Assistant.
@@ -304,7 +306,7 @@ The journal shows the receiver starting. Use MQTT Explorer or Home Assistant's M
 python -m unittest discover -s tests -v
 ```
 
-Tests cover a known CRC vector and synthetic field mapping. They do not substitute for live RF tests.
+Tests cover a known CRC vector, synthetic field mapping, and rejection of the observed shifted payload in measurement mode. Live reception can be checked separately with an RTL-SDR.
 
 ## Scope
 

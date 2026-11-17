@@ -58,7 +58,7 @@ def decode_block(z, header=bytes.fromhex('1d40861d')):
         hz = np.convolve(hz, np.ones(9)/9, 'same')
         low, high = np.percentile(hz[lo:hi], [20,80])
         mid = (low+high)/2
-        # Try best eye-opening phases first; CRC chooses the valid result.
+        # Try the sampling phases with the best eye opening first.
         phases = []
         for phase in range(63):
             idx = lo + np.arange(phase, hi-lo, FS/38400).astype(int)
@@ -77,6 +77,10 @@ def decode_block(z, header=bytes.fromhex('1d40861d')):
                 continue
             data = data[:length]
             if crc16(data[:-2]) != int.from_bytes(data[-2:], 'big'):
+                continue
+            # Observed 29-byte payloads with an extra 00 before 47 40 50
+            # pass CRC but shift every measurement field by one byte.
+            if header is not None and data[3:8] == b'\x1d\x00\x47\x40\x50':
                 continue
             found.append(((first+lo)/FS, data))
             break

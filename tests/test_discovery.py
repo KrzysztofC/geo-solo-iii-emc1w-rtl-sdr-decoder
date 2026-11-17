@@ -4,8 +4,8 @@ from geo_decoder import crc16,decode_block
 from cli import pretty
 
 class DiscoveryTests(unittest.TestCase):
-    def signal(self, header):
-        data=header+bytes(header[3])
+    def signal(self, header, payload_prefix=b''):
+        data=header+payload_prefix+bytes(header[3]-len(payload_prefix))
         data+=crc16(data).to_bytes(2,'big')
         bits='01'*32+'0111101110111001'+''.join(f'{b:08b}' for b in data)+'01'*16
         index=(np.arange(int(len(bits)*62.5))/62.5).astype(int)
@@ -22,6 +22,14 @@ class DiscoveryTests(unittest.TestCase):
     def test_short_family_discovery(self):
         z,data=self.signal(bytes.fromhex('ffc0ff12'))
         self.assertTrue(any(frame==data for _,frame in decode_block(z,None)))
+
+    def test_shifted_measurements_only_appear_in_discovery(self):
+        header = bytes.fromhex('1234561d')
+        normal, frame = self.signal(header, bytes.fromhex('474050'))
+        shifted, shifted_frame = self.signal(header, bytes.fromhex('00474050'))
+        self.assertIn(frame, [data for _, data in decode_block(normal, header)])
+        self.assertEqual(decode_block(shifted, header), [])
+        self.assertIn(shifted_frame, [data for _, data in decode_block(shifted, None)])
 
     def test_pretty_unknown_is_raw(self):
         output=pretty(dict(type='discovery',time_utc='test',header='ffc0ff12',payload_bytes=18,frame_bytes=24,frame_hex='example'))
