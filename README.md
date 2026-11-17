@@ -25,7 +25,7 @@ A Raspberry Pi 4B with an R828D-based RTL-SDR also recorded valid measurement fr
    python cli.py --meter-id B3C0EB --seconds 60
    ```
 
-If `rtl_433` shows no `GEO-minimCT` result, run `python cli.py --discover --format pretty --seconds 120`. Look for a repeated CRC-valid 35-byte frame with a header ending in `1d`. The first six hex digits are the candidate ID. Verify readings against the meter, especially if multiple candidates appear.
+If `rtl_433` shows no `GEO-minimCT` result, run `python cli.py --discover --format pretty --seconds 120`. Look for a repeated CRC-valid 35-byte frame with a header ending in `1d`. The first six hex digits are the candidate ID.
 
 `--meter-id` accepts uppercase and lowercase hex and selects the 29-byte Solo III payload. Running without a selection uses the original ID `1D4086`.
 
@@ -82,7 +82,7 @@ Reception is fixed at 868 MHz, 2.4 MS/s and 28 dB gain. Poor antenna placement, 
 
 ## Home Assistant
 
-Publish the decoder's JSON readings from a Raspberry Pi to the MQTT broker used by Home Assistant. The examples use meter ID `B3C0EB`, broker `192.168.50.161:1883`, MQTT username `mqtt`, and Pi user `schriss`. Replace those values for your setup. If you change the MQTT topic, use the same topic in the publisher, MQTT Explorer, and Home Assistant.
+Publish the decoder's JSON readings from a Raspberry Pi to the MQTT broker used by Home Assistant. The examples use meter ID `B3C0EB`, broker `192.168.50.161:1883`, MQTT username `mqtt`. If you change the MQTT topic, use the same topic in the publisher, MQTT Explorer, and Home Assistant.
 
 ### Set up the MQTT broker
 
@@ -199,9 +199,9 @@ After=network-online.target
 
 [Service]
 Type=simple
-User=schriss
-WorkingDirectory=/home/schriss/geo-solo-iii-emc1w-rtl-sdr-decoder
-Environment=XDG_CONFIG_HOME=/home/schriss/.config/geo-solo3
+User=EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE
+WorkingDirectory=/home/EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE/geo-solo-iii-emc1w-rtl-sdr-decoder
+Environment=XDG_CONFIG_HOME=/home/EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE/.config/geo-solo3
 ExecStart=/bin/bash -c 'exec /usr/bin/mosquitto_pub -h 192.168.50.161 -p 1883 -t geo/solo3/b3c0eb/state -q 1 -l < <(exec .venv/bin/python cli.py --meter-id B3C0EB --format json)'
 Restart=always
 RestartSec=5
