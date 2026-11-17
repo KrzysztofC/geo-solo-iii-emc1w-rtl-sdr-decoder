@@ -183,9 +183,29 @@ mqtt:
       state_class: total_increasing
       unit_of_measurement: "kWh"
       expire_after: 30
+
+    - name: "Geo Grid Import Energy"
+      unique_id: geo_solo3_b3c0eb_import_kwh
+      state_topic: "geo/solo3/b3c0eb/state"
+      value_template: "{{ value_json.inferred_import_kWh }}"
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: "kWh"
+      expire_after: 30
+
+    - name: "Geo Grid Export Energy"
+      unique_id: geo_solo3_b3c0eb_export_kwh
+      state_topic: "geo/solo3/b3c0eb/state"
+      value_template: "{{ value_json.inferred_export_kWh }}"
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: "kWh"
+      expire_after: 30
 ```
 
-After comparing **Geo Solar Energy** with the physical meter, select it as the cumulative solar production sensor in the Energy dashboard. The `inferred_*_kWh` fields are also published. Verify them against your meter registers before using them as energy totals. [Home Assistant Energy dashboard sensor requirements](https://www.home-assistant.io/docs/energy/faq/#the-sensor-doesnt-appear-in-the-selection-list)
+Compare **Geo Solar Energy** with the physical meter and check that changes in the inferred **Geo Grid Import Energy** and **Geo Grid Export Energy** match their respective grid meter registers before adding them to the Energy dashboard. [Home Assistant Energy dashboard sensor requirements](https://www.home-assistant.io/docs/energy/faq/#the-sensor-doesnt-appear-in-the-selection-list)
+
+For daily totals, create one **Utility Meter** helper per energy sensor and set the reset cycle to **Daily**. Leave **Delta values** off so the helpers add the differences between cumulative readings. Turn **Periodically resetting** off for lifetime counters that never reset. [Home Assistant Utility Meter documentation](https://www.home-assistant.io/integrations/utility_meter/)
 
 ### Run continuously with systemd
 
