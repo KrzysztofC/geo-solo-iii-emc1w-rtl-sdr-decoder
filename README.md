@@ -82,7 +82,7 @@ Reception is fixed at 868 MHz, 2.4 MS/s and 28 dB gain. Poor antenna placement, 
 
 ## Home Assistant
 
-Publish the decoder's JSON readings from a Raspberry Pi to the MQTT broker used by Home Assistant. The examples use meter ID `B3C0EB`, broker `192.168.50.161:1883`, MQTT username `mqtt`. If you change the MQTT topic, use the same topic in the publisher, MQTT Explorer, and Home Assistant.
+Publish the decoder's JSON readings from a Raspberry Pi to the MQTT broker used by Home Assistant. The examples use meter ID `B3C0EB`, broker `192.168.50.161:1883`, and MQTT username `mqtt`. Replace those values for your setup. If you change the MQTT topic, use the same topic in the publisher, MQTT Explorer, and Home Assistant.
 
 ### Set up the MQTT broker
 
@@ -189,36 +189,43 @@ After comparing **Geo Solar Energy** with the physical meter, select it as the c
 
 ### Run continuously with systemd
 
-Create `/etc/systemd/system/geo-solo3-mqtt.service` with `sudo nano`. Set `User`, `WorkingDirectory`, and `XDG_CONFIG_HOME` to match your Pi setup. The service restarts after the decoder's default 24-hour run or if the publisher exits. [systemd service documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)
+From the Pi account that runs the decoder, create the user service file:
+
+```sh
+mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+nano "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/geo-solo3-mqtt.service"
+```
+
+Paste the unit below. Systemd runs it as that account and expands `%h` to its home directory. Adjust `WorkingDirectory` if you cloned the repository elsewhere. The service restarts after the decoder's default 24-hour run or if the publisher exits. [systemd unit specifiers](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#Specifiers)
 
 ```ini
 [Unit]
 Description=Geo Solo III meter to MQTT
-Wants=network-online.target
-After=network-online.target
 
 [Service]
 Type=simple
-User=EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE
-WorkingDirectory=/home/EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE/geo-solo-iii-emc1w-rtl-sdr-decoder
-Environment=XDG_CONFIG_HOME=/home/EDIT_THIS_LOCAL_PI_USERNAME_GOES_HERE/.config/geo-solo3
+WorkingDirectory=%h/geo-solo-iii-emc1w-rtl-sdr-decoder
+Environment=XDG_CONFIG_HOME=%h/.config/geo-solo3
 ExecStart=/bin/bash -c 'exec /usr/bin/mosquitto_pub -h 192.168.50.161 -p 1883 -t geo/solo3/b3c0eb/state -q 1 -l < <(exec .venv/bin/python cli.py --meter-id B3C0EB --format json)'
 Restart=always
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ```
 
-Stop the test pipeline and any other program using the SDR. Enable the service at boot and follow its logs:
+Stop the test pipeline and any other program using the SDR. If you previously installed a system-wide `geo-solo3-mqtt.service`, stop and disable it with `sudo systemctl disable --now geo-solo3-mqtt.service` so both services do not try to open the same receiver.
+
+Enable lingering for your account so its services start at boot and keep running after logout. Then enable the user service and follow its logs. [loginctl documentation](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html)
 
 ```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now geo-solo3-mqtt.service
-sudo journalctl -u geo-solo3-mqtt.service -f
+sudo loginctl enable-linger "$(id -un)"
+systemctl --user daemon-reload
+systemctl --user enable --now geo-solo3-mqtt.service
+journalctl --user -u geo-solo3-mqtt.service -f
 ```
 
-Example journal output from a Raspberry Pi 4B:
+Example receiver startup from the original system-wide service on a Raspberry Pi 4B:
 
 ```text
 Nov 17 12:03:48 raspberrypi4b systemd[1]: Started geo-solo3-mqtt.service - Geo Solo III meter to MQTT.
