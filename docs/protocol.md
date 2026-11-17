@@ -9,13 +9,15 @@ All offsets below start immediately after the two-byte sync word and include the
 | FSK tones | Approximately 868.237 and 868.399 MHz |
 | Bit rate | Approximately 38,400 bit/s |
 | Sync | 7B B9 |
-| Header | 1D 40 86 1D |
+| Header | Three-byte radio ID followed by payload length 1D |
 | Frame length | 35 bytes after sync |
 | CRC | CRC-16, polynomial 0x8005, initial 0, no reflection, no final XOR |
 | CRC encoding | Final two bytes, big endian, covers preceding 33 bytes |
 
 | Offset | Length | Interpretation |
 |---|---|---|
+| 0 | 3 | Radio ID, observed as 1D 40 86 and B3 C0 EB |
+| 3 | 1 | Measurement payload length, 1D |
 | 7 | 2 | Household USE, watts |
 | 9 | 2 | Generation, watts |
 | 11 | 4 | Inferred cumulative usage, Wh |
@@ -32,5 +34,5 @@ The six-character pairing code is not required by this decoder. Its exact role i
 
 The demodulator locates bursts, filters the observed FSK band, tries sampling phases, and accepts only the expected header and valid CRC. It retains 25 ms overlap between blocks and briefly deduplicates identical frames. USB reads run on a separate thread with a bounded memory queue. Freshness timestamps are estimates anchored to USB arrival.
 
-No claim is made that this header uniquely identifies a physical meter. Multi-meter selection requires additional investigation.
+In the Raspberry Pi capture, the radio ID B3 C0 EB also appeared in the short frames that `rtl_433` reported as `GEO-minimCT`. The decoder uses the configured ID to select measurement frames. Confirm the source by comparing values with the physical meter or IHD.
 

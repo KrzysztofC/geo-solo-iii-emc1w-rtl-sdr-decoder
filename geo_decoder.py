@@ -6,6 +6,7 @@ frames matching the experimentally identified header are emitted.
 import ctypes as c
 import datetime as dt
 import os
+import sys
 import threading
 import queue
 import time
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 FS = 2400000
 SYNC = '0111101110111001'
+DEFAULT_METER_ID = bytes.fromhex('1d4086')
+MEASUREMENT_PAYLOAD_LENGTH = 0x1d
 
 def crc16(data):
     crc = 0
@@ -25,8 +28,9 @@ def crc16(data):
             crc = ((crc << 1) ^ (0x8005 if crc & 0x8000 else 0)) & 0xffff
     return crc
 
-def decode_block(z):
+def decode_block(z, meter_id=DEFAULT_METER_ID):
     """Return validated frames and offsets, preserving caller overlap."""
+    header = meter_id + bytes([MEASUREMENT_PAYLOAD_LENGTH])
     nfft = 4096
     n = len(z) // nfft
     if not n:
@@ -69,7 +73,7 @@ def decode_block(z):
                 continue
             payload = bits[pos+16:]
             data = bytes(int(payload[j:j+8],2) for j in range(0,len(payload)-7,8))
-            if len(data) < 4 or data[:4] != bytes.fromhex('1d40861d'):
+            if len(data) < 4 or data[:4] != header:
                 continue
             length = 4 + data[3] + 2
             if len(data) < length:
@@ -92,10 +96,15 @@ def reading(data):
                 inferred_export_kWh=int.from_bytes(data[23:27],'big')/1000,
                 frame_hex=data.hex(), crc_ok=True)
 
-def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_index=0):
-    base = dll_path or r'C:\Program Files\SDR-Radio.com (V3)'
-    dll_dir = os.add_dll_directory(base)
-    lib = c.CDLL(base+r'\rtlsdr.dll')
+def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_index=0,
+         *, meter_id=DEFAULT_METER_ID):
+    dll_dir = None
+    if sys.platform == 'win32':
+        base = dll_path or r'C:\Program Files\SDR-Radio.com (V3)'
+        dll_dir = os.add_dll_directory(base)
+        lib = c.CDLL(os.path.join(base, 'rtlsdr.dll'))
+    else:
+        lib = c.CDLL(dll_path or 'librtlsdr.so')
     dev = c.c_void_p()
     lib.rtlsdr_open.argtypes = [c.POINTER(c.c_void_p), c.c_uint32]
     lib.rtlsdr_close.argtypes = [c.c_void_p]
@@ -147,7 +156,7 @@ def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_ind
             raw = np.frombuffer(chunk,dtype=np.uint8).astype(np.float32)-127.5
             z = raw[::2]+1j*raw[1::2]
             block = np.concatenate([carry,z])
-            for offset,data in decode_block(block):
+            for offset,data in decode_block(block, meter_id):
                 now = time.monotonic()
                 if data in seen and now-seen[data] < 3:
                     continue

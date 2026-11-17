@@ -8,7 +8,26 @@ It receives locally at 868 MHz without the Geo cloud, hub, or IHD being powered 
 
 Tested on one installation using Windows and a Nooelec NESDR Mini 2 (RTL2832U/R820T2). Instantaneous values matched the Solo III IHD during load tests, and the generation counter matched the physical meter register. Transmission continued with both hub and IHD off.
 
-Other meters, firmware versions and nearby installations have not been tested. The fixed header filter is a message-family filter, **not a unique meter identity filter**. Do not assume this selects your meter if multiple compatible transmitters are in range. Linux library loading is provided but has not been hardware-tested.
+A Raspberry Pi 4B with an R828D-based RTL-SDR also recorded valid measurement frames from a second installation. Other firmware versions may use different frame formats. If several compatible transmitters are in range, verify your meter ID against the meter or the Solo III IHD.
+
+## Find your meter ID
+
+1. With the decoder and other SDR applications stopped, place the antenna near the meter's radio module and listen at 868 MHz.
+
+   ```sh
+   rtl_433 -f 868M -T 120
+   ```
+
+2. Look for a repeated `GEO-minimCT` result with `Integrity: CRC` and copy its six-digit hexadecimal `id`, such as `B3C0EB`. On the Raspberry Pi capture, this ID also appeared in the first three bytes of the 35-byte Solo III measurement frames.
+3. Pass that ID to the decoder and compare the generation counter with the physical meter, or compare the instantaneous readings with the Solo III IHD. If you see multiple IDs, verify which one matches your meter.
+
+   ```sh
+   python cli.py --meter-id B3C0EB --seconds 60
+   ```
+
+If `rtl_433` prints no `GEO-minimCT` results, the ID can also be recovered from the first three bytes after sync word `7b b9` in a CRC-valid Solo III measurement frame. The following byte is the payload length `1d`. See the [protocol notes](docs/protocol.md).
+
+`--meter-id` accepts uppercase or lowercase hex. It defaults to `1D4086` from the original installation.
 
 ## Requirements
 
@@ -26,13 +45,13 @@ In PowerShell, from this project directory:
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe cli.py --seconds 60
+.\.venv\Scripts\python.exe cli.py --meter-id B3C0EB --seconds 60
 ```
 
 The default library directory is `C:\Program Files\SDR-Radio.com (V3)`. For a different installation:
 
 ```powershell
-.\.venv\Scripts\python.exe cli.py --library "C:\path\to\dll-directory" --seconds 86400
+.\.venv\Scripts\python.exe cli.py --library "C:\path\to\dll-directory" --meter-id B3C0EB --seconds 86400
 ```
 
 Python and the native DLL must use matching architectures (normally 64-bit). A DLL-loading error can also mean a dependency is missing.
@@ -44,10 +63,10 @@ Install your distribution's librtlsdr package and Python virtual environment sup
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python cli.py --seconds 60
+.venv/bin/python cli.py --meter-id B3C0EB --seconds 60
 ```
 
-USB permissions and the DVB kernel driver may require distribution-specific configuration. Follow your RTL-SDR supplier's instructions. This path is not yet hardware verified.
+Replace `B3C0EB` in the examples with your meter ID. If the shared library is outside the default library search path, pass its full path with `--library`. USB permissions and the DVB kernel driver may require distribution-specific configuration. Follow your RTL-SDR supplier's instructions.
 
 ## Output and operation
 
