@@ -8,7 +8,26 @@ It receives locally at 868 MHz without the Geo cloud, hub, or IHD being powered 
 
 Tested on one installation using Windows and a Nooelec NESDR Mini 2 (RTL2832U/R820T2). Instantaneous values matched the Solo III IHD during load tests, and the generation counter matched the physical meter register. Transmission continued with both hub and IHD off.
 
-Other meters, firmware versions and nearby installations have not been tested. The selected header filter is a message-family filter, **not a unique meter identity filter**. Do not assume this selects your meter if multiple compatible transmitters are in range. Linux library loading is provided but has not been hardware-tested.
+A Raspberry Pi 4B with an R828D-based RTL-SDR also recorded valid measurement frames. Firmware versions may differ. Verify the selected radio ID against the physical meter or Solo III IHD.
+
+## Find your meter ID
+
+1. Close other SDR applications, place the antenna near the meter's radio module, and run:
+
+   ```sh
+   rtl_433 -f 868M -T 120
+   ```
+
+2. Copy the six-digit hexadecimal `id` from a repeated `GEO-minimCT` result with `Integrity: CRC`. For example, `B3C0EB` appeared both in the `rtl_433` output and at the start of the 35-byte Solo III frames in the Raspberry Pi capture.
+3. Stop `rtl_433`, then pass the ID to the decoder. Compare the generation counter with the physical meter or compare instantaneous readings with the Solo III IHD.
+
+   ```sh
+   python cli.py --meter-id B3C0EB --seconds 60
+   ```
+
+If `rtl_433` shows no `GEO-minimCT` result, run `python cli.py --discover --format pretty --seconds 120`. Look for a repeated CRC-valid 35-byte frame with a header ending in `1d`. The first six hex digits are the candidate ID. Verify readings against the meter, especially if multiple candidates appear.
+
+`--meter-id` accepts uppercase and lowercase hex and selects the 29-byte Solo III payload. Running without a selection uses the original ID `1D4086`.
 
 ## Requirements
 
@@ -47,7 +66,7 @@ python3 -m venv .venv
 .venv/bin/python cli.py --seconds 60
 ```
 
-USB permissions and the DVB kernel driver may require distribution-specific configuration. Follow your RTL-SDR supplier's instructions. This path is not yet hardware verified.
+USB permissions and the DVB kernel driver may require distribution-specific configuration. Follow your RTL-SDR supplier's instructions. If automatic library discovery fails, pass the full path to the shared library with `--library`.
 
 ## Output and operation
 
@@ -88,7 +107,7 @@ No license has been selected yet. The repository owner should add their chosen l
 Use `python cli.py --format pretty --seconds 60` for readable terminal output.
 Use `python cli.py --discover --format pretty --seconds 180` to inspect other
 CRC-valid Geo headers without interpreting them as measurements.
-JSON remains the default. Custom headers require an explicit layout assumption.
+JSON remains the default. With `--header`, custom measurement headers require `--assume-solo-layout`. The `--meter-id` option selects that layout directly.
 See [Discovery, selection and output](docs/discovery-and-output.md) for Windows
 and Linux commands, field meanings, custom header examples and troubleshooting.
 
