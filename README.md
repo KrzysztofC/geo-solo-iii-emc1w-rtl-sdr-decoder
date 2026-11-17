@@ -8,7 +8,7 @@ It receives locally at 868 MHz without the Geo cloud, hub, or IHD being powered 
 
 Tested on one installation using Windows and a Nooelec NESDR Mini 2 (RTL2832U/R820T2). Instantaneous values matched the Solo III IHD during load tests, and the generation counter matched the physical meter register. Transmission continued with both hub and IHD off.
 
-Other meters, firmware versions and nearby installations have not been tested. The fixed header filter is a message-family filter, **not a unique meter identity filter**. Do not assume this selects your meter if multiple compatible transmitters are in range. Linux library loading is provided but has not been hardware-tested.
+Other meters, firmware versions and nearby installations have not been tested. The selected header filter is a message-family filter, **not a unique meter identity filter**. Do not assume this selects your meter if multiple compatible transmitters are in range. Linux library loading is provided but has not been hardware-tested.
 
 ## Requirements
 
@@ -82,4 +82,13 @@ This is an independent reverse-engineering project, unaffiliated with Geo, ASL, 
 ## License
 
 No license has been selected yet. The repository owner should add their chosen license before publication; downloading source alone does not grant redistribution rights.
+
+## Discovery and readable output
+
+Use `python cli.py --format pretty --seconds 60` for readable terminal output.
+Use `python cli.py --discover --format pretty --seconds 180` to inspect other
+CRC-valid Geo headers without interpreting them as measurements.
+JSON remains the default. Custom headers require an explicit layout assumption.
+See [Discovery, selection and output](docs/discovery-and-output.md) for Windows
+and Linux commands, field meanings, custom header examples and troubleshooting.
 

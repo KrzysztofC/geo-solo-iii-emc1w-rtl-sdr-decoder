@@ -4,6 +4,7 @@ Uses the installed SDR Console RTL-SDR library and NumPy. Only CRC-valid
 frames matching the experimentally identified header are emitted.
 """
 import ctypes as c
+import ctypes.util
 import datetime as dt
 import os
 import threading
@@ -25,7 +26,7 @@ def crc16(data):
             crc = ((crc << 1) ^ (0x8005 if crc & 0x8000 else 0)) & 0xffff
     return crc
 
-def decode_block(z):
+def decode_block(z, header=bytes.fromhex('1d40861d')):
     """Return validated frames and offsets, preserving caller overlap."""
     nfft = 4096
     n = len(z) // nfft
@@ -69,7 +70,7 @@ def decode_block(z):
                 continue
             payload = bits[pos+16:]
             data = bytes(int(payload[j:j+8],2) for j in range(0,len(payload)-7,8))
-            if len(data) < 4 or data[:4] != bytes.fromhex('1d40861d'):
+            if len(data) < 4 or (header is not None and data[:4] != header):
                 continue
             length = 4 + data[3] + 2
             if len(data) < length:
@@ -82,6 +83,8 @@ def decode_block(z):
     return found
 
 def reading(data):
+    if len(data)!=35 or data[3]!=29:
+        raise ValueError('Solo III measurement layout requires a 35-byte frame')
     use = int.from_bytes(data[7:9], 'big')
     gen = int.from_bytes(data[9:11], 'big')
     return dict(gen_W=gen, use_W=use, import_W=max(use-gen,0),
@@ -92,10 +95,16 @@ def reading(data):
                 inferred_export_kWh=int.from_bytes(data[23:27],'big')/1000,
                 frame_hex=data.hex(), crc_ok=True)
 
-def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_index=0):
-    base = dll_path or r'C:\Program Files\SDR-Radio.com (V3)'
-    dll_dir = os.add_dll_directory(base)
-    lib = c.CDLL(base+r'\rtlsdr.dll')
+def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_index=0,
+         header=bytes.fromhex('1d40861d'), discover=False):
+    if os.name == 'nt':
+        base = dll_path or r'C:\Program Files\SDR-Radio.com (V3)'
+        dll_dir = os.add_dll_directory(base)
+        library = os.path.join(base, 'rtlsdr.dll')
+    else:
+        library = dll_path or ctypes.util.find_library('rtlsdr')
+        if not library: raise RuntimeError('Install librtlsdr or supply --library')
+    lib = c.CDLL(library)
     dev = c.c_void_p()
     lib.rtlsdr_open.argtypes = [c.POINTER(c.c_void_p), c.c_uint32]
     lib.rtlsdr_close.argtypes = [c.c_void_p]
@@ -147,7 +156,7 @@ def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_ind
             raw = np.frombuffer(chunk,dtype=np.uint8).astype(np.float32)-127.5
             z = raw[::2]+1j*raw[1::2]
             block = np.concatenate([carry,z])
-            for offset,data in decode_block(block):
+            for offset,data in decode_block(block, None if discover else header):
                 now = time.monotonic()
                 if data in seen and now-seen[data] < 3:
                     continue
@@ -158,7 +167,12 @@ def live(seconds, on_reading=None, external_stop=None, dll_path=None, device_ind
                 stamp = chunk_end - dt.timedelta(seconds=(len(z)+len(carry))/FS-offset)
                 received=dt.datetime.now(dt.timezone.utc)
                 delay=(received-stamp).total_seconds()
-                row = dict(time_utc=stamp.isoformat(), received_utc=received.isoformat(), estimated_delay_s=delay, fresh=delay<2, **reading(data))
+                if discover:
+                    values=dict(type='discovery',header=data[:4].hex(),payload_bytes=data[3],frame_bytes=len(data),frame_hex=data.hex(),crc_ok=True)
+                else:
+                    if len(data)!=35 or data[3]!=29: continue
+                    values=dict(type='measurement',header=data[:4].hex(),**reading(data))
+                row = dict(time_utc=stamp.isoformat(), received_utc=received.isoformat(), estimated_delay_s=delay, fresh=delay<2, **values)
                 if on_reading and row['fresh']:
                     on_reading(row)
                 last_good=now;total+=1
