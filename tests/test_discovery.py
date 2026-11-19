@@ -24,12 +24,15 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(any(frame==data for _,frame in decode_block(z,None)))
 
     def test_shifted_measurements_only_appear_in_discovery(self):
-        header = bytes.fromhex('1234561d')
-        normal, frame = self.signal(header, bytes.fromhex('474050'))
-        shifted, shifted_frame = self.signal(header, bytes.fromhex('00474050'))
-        self.assertIn(frame, [data for _, data in decode_block(normal, header)])
-        self.assertEqual(decode_block(shifted, header), [])
-        self.assertIn(shifted_frame, [data for _, data in decode_block(shifted, None)])
+        for header in (bytes.fromhex('b3c0eb1d'), bytes.fromhex('e980b81d')):
+            for prefix_byte in (0x00, 0x47, 0x48, 0xff):
+                with self.subTest(header=header.hex(), prefix_byte=prefix_byte):
+                    prefix = bytes([prefix_byte, 0x40, 0x50])
+                    normal, frame = self.signal(header, prefix)
+                    shifted, shifted_frame = self.signal(header, b'\x00' + prefix)
+                    self.assertIn(frame, [data for _, data in decode_block(normal, header)])
+                    self.assertEqual(decode_block(shifted, header), [])
+                    self.assertIn(shifted_frame, [data for _, data in decode_block(shifted, None)])
 
     def test_pretty_unknown_is_raw(self):
         output=pretty(dict(type='discovery',time_utc='test',header='ffc0ff12',payload_bytes=18,frame_bytes=24,frame_hex='example'))

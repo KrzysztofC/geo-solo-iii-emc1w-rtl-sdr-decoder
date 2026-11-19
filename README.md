@@ -105,7 +105,7 @@ No files or raw I/Q recordings are saved automatically. Redirecting output to a 
 
 Reception is fixed at 868 MHz, 2.4 MS/s and 28 dB gain. Poor antenna placement, interference or different radio variants may prevent decoding. A quiet console means no fresh matching CRC-valid packets were found; it does not prove a hardware fault.
 
-Measurement mode drops CRC-valid 29-byte payloads that start with `00 47 40 50`. In two logged frames, the extra leading zero shifted the measurement fields by one byte and caused large spikes in the MQTT energy readings. Use `--discover --include-frame` to inspect those frames as raw packets.
+Measurement mode drops CRC-valid 29-byte payloads that start with `00 XX 40 50`, where `XX` is a variable byte. In two logged frames, the extra leading zero shifted the measurement fields by one byte and caused large spikes in the MQTT energy readings. The byte before `40 50` changed from `47` to `48` after pairing on one installation; the filter covers either value and other values of that byte. Use `--discover --include-frame` to inspect those frames as raw packets.
 
 ## Home Assistant
 

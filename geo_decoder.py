@@ -78,9 +78,10 @@ def decode_block(z, header=bytes.fromhex('1d40861d')):
             data = data[:length]
             if crc16(data[:-2]) != int.from_bytes(data[-2:], 'big'):
                 continue
-            # Observed 29-byte payloads with an extra 00 before 47 40 50
-            # pass CRC but shift every measurement field by one byte.
-            if header is not None and data[3:8] == b'\x1d\x00\x47\x40\x50':
+            # A leading 00 before the variable byte and 40 50 prefix
+            # shifts the measurement fields even when CRC passes.
+            if (header is not None and data[3:5] == b'\x1d\x00'
+                    and data[6:8] == b'\x40\x50'):
                 continue
             found.append(((first+lo)/FS, data))
             break
