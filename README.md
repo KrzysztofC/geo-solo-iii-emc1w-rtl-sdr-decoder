@@ -12,20 +12,45 @@ A Raspberry Pi 4B with an R828D-based RTL-SDR also recorded valid measurement fr
 
 ## Find your meter ID
 
-1. Close other SDR applications, place the antenna near the meter's radio module, and run:
+Install the dependencies using the Windows or Linux instructions below first. Use the decoder's discovery mode to find the ID directly from its CRC-valid measurement frames.
+
+1. Close other SDR applications and place the antenna near the meter's radio module. On a Pi running the MQTT user service, stop it to free the receiver:
 
    ```sh
-   rtl_433 -f 868M -T 120
+   systemctl --user stop geo-solo3-mqtt.service
    ```
 
-2. Copy the six-digit hexadecimal `id` from a repeated `GEO-minimCT` result with `Integrity: CRC`. For example, `B3C0EB` appeared both in the `rtl_433` output and at the start of the 35-byte Solo III frames in the Raspberry Pi capture.
-3. Stop `rtl_433`, then pass the ID to the decoder. Compare the generation counter with the physical meter or compare instantaneous readings with the Solo III IHD.
+2. From the repository directory, run discovery with your virtual environment's Python:
 
    ```sh
-   python cli.py --meter-id B3C0EB --seconds 60
+   .venv/bin/python cli.py --discover --format pretty --seconds 120
    ```
 
-If `rtl_433` shows no `GEO-minimCT` result, run `python cli.py --discover --format pretty --seconds 120`. Look for a repeated CRC-valid 35-byte frame with a header ending in `1d`. The first six hex digits are the candidate ID.
+   On Windows, use `.\.venv\Scripts\python.exe` in place of `.venv/bin/python`. If required, add `--library` with your library path.
+
+3. Look for repeated output with `PAYLOAD 29 B`, `FRAME 35 B`, and `CRC OK`. For example:
+
+   ```text
+   2026-11-19T19:26:17.686494+00:00  HEADER e980b81d  PAYLOAD 29 B  FRAME 35 B  CRC OK
+   ```
+
+   The first six header digits, `E980B8`, are the candidate three-byte radio ID. The final `1d` is the payload length. Pass the six-digit ID to measurement mode and compare the generation counter with the physical meter or instantaneous readings with the Solo III IHD:
+
+   ```sh
+   .venv/bin/python cli.py --meter-id E980B8 --seconds 60
+   ```
+
+Pairing the Solo III display with the meter can change this ID. One installation changed from `B3C0EB` to `E980B8` after pairing. If readings stop after pairing, repeat discovery and update `--meter-id` in the service's `ExecStart` command:
+
+```sh
+nano "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/geo-solo3-mqtt.service"
+systemctl --user daemon-reload
+systemctl --user restart geo-solo3-mqtt.service
+```
+
+The MQTT topic is configured separately from the radio ID. When updating an existing service after pairing, keep its topic, such as `geo/solo3/b3c0eb/state`, so the configured Home Assistant sensors continue receiving readings.
+
+`rtl_433 -f 868M -T 120` can sometimes show a matching `GEO-minimCT` ID, but it may show only unrelated devices even while this decoder receives Solo III frames. Use the discovery command above to identify the current measurement header.
 
 `--meter-id` accepts uppercase and lowercase hex and selects the 29-byte Solo III payload. Running without a selection uses the original ID `1D4086`.
 
@@ -96,7 +121,7 @@ Clone this repository to `~/geo-solo-iii-emc1w-rtl-sdr-decoder`, plug in the RTL
 
 ```sh
 sudo apt update
-sudo apt install python3-venv rtl-sdr rtl-433 mosquitto-clients
+sudo apt install python3-venv rtl-sdr mosquitto-clients
 cd ~/geo-solo-iii-emc1w-rtl-sdr-decoder
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
